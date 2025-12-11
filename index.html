@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Price Quotation Generator</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    
+    <!-- SheetJS for Excel Parsing -->
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        /* A4 Paper Styling for Screen */
+        .a4-page {
+            width: 210mm;
+            min-height: 297mm;
+            background: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            margin: 0 auto;
+            position: relative;
+            padding: 15mm 15mm 15mm 15mm; /* Padding for content inside margins */
+            box-sizing: border-box; 
+            overflow: hidden; /* Prevent spill on screen */
+        }
+
+        /* Input Styling */
+        .form-input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            margin-bottom: 0.5rem;
+        }
+        .form-label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #4a5568;
+            margin-bottom: 0.25rem;
+        }
+        
+        /* Table Styling */
+        .quote-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+            font-size: 12px;
+        }
+        .quote-table th {
+            background-color: #f3f4f6;
+            border: 1px solid #000;
+            padding: 8px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .quote-table td {
+            border: 1px solid #000;
+            padding: 6px;
+        }
+        .quote-table td[contenteditable="true"]:hover {
+            background-color: #f0f9ff;
+            cursor: text;
+        }
+        .quote-table input {
+            width: 100%;
+            border: none;
+            background: transparent;
+            text-align: inherit;
+        }
+
+        /* Print Media Query - CRITICAL */
+        @media print {
+            @page {
+                size: A4;
+                margin: 0; /* We handle margins via padding/fixed elements */
+            }
+            
+            body {
+                background: white;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            /* Hide Sidebar and UI controls */
+            #sidebar, #controls, .no-print {
+                display: none !important;
+            }
+
+            /* Main Container Full Width */
+            #main-content {
+                width: 100%;
+                margin: 0;
+                padding: 0;
+                height: auto;
+                overflow: visible;
+            }
+
+            /* Reset A4 Container for Print */
+            .a4-page {
+                width: 100%;
+                height: auto;
+                min-height: auto;
+                box-shadow: none;
+                margin: 0;
+                padding: 0; /* Padding handled by fixed header spacing */
+                border: none;
+                overflow: visible;
+            }
+
+            /* Fixed Header/Footer Logic */
+            #print-header {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 5cm; /* Space for logo and banner */
+                z-index: 1000;
+                background: white;
+            }
+
+            #print-footer {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                width: 100%;
+                height: 1.5cm; /* Adjust based on footer image height */
+                z-index: 1000;
+                background: white;
+            }
+
+            /* Content Spacing for Fixed Elements */
+            /* Using thead/tfoot for table repetition is good, but for full page layout: */
+            #print-body {
+                margin-top: 5cm; /* Match header height */
+                margin-bottom: 2cm; /* Match footer height */
+                padding-left: 1.5cm;
+                padding-right: 1.5cm;
+            }
+
+            /* Ensure table rows don't break awkwardly */
+            tr {
+                page-break-inside: avoid;
+            }
+        }
+
+        /* Screen-only representations of header/footer */
+        .screen-header-shim {
+            height: 5cm;
+            position: relative;
+        }
+        .screen-footer-shim {
+            height: 1.5cm;
+            margin-top: auto;
+        }
+
+        /* Rich Text Area */
+        .rich-text {
+            white-space: pre-wrap;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen overflow-hidden flex text-gray-800 font-sans">
+
+    <!-- Sidebar: Controls -->
+    <div id="sidebar" class="w-1/3 min-w-[350px] h-full bg-white border-r border-gray-300 overflow-y-auto p-6 shadow-xl z-20">
+        <h1 class="text-2xl font-bold mb-6 text-blue-700"><i class="fas fa-file-invoice mb-2"></i> Quote Generator</h1>
+
+        <!-- Accordion: Branding -->
+        <div class="mb-6 border rounded-lg p-4 bg-gray-50">
+            <h2 class="font-bold text-lg mb-3 border-b pb-2">1. Branding</h2>
+            
+            <div class="mb-3">
+                <label class="form-label">Logo Source</label>
+                <select id="logoType" class="form-input" onchange="toggleSource('logo')">
+                    <option value="url">Google Drive / URL</option>
+                    <option value="file">Upload File</option>
+                </select>
+                <input type="text" id="logoUrl" class="form-input" placeholder="Image URL" value="https://lh3.googleusercontent.com/d/1fwtQu3Fqq9FQs-QoTYEkhm-Vz3BPryAQ=w1000">
+                <input type="file" id="logoFile" class="form-input hidden" accept="image/*">
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Header Banner Source</label>
+                <select id="headerType" class="form-input" onchange="toggleSource('header')">
+                    <option value="url">Google Drive / URL</option>
+                    <option value="file">Upload File</option>
+                </select>
+                <input type="text" id="headerUrl" class="form-input" placeholder="Image URL" value="https://lh3.googleusercontent.com/d/1lQI7gYEz3IlGbu2C4wWbwMRlcl05qy0w=w1000">
+                <input type="file" id="headerFile" class="form-input hidden" accept="image/*">
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Footer Source</label>
+                <select id="footerType" class="form-input" onchange="toggleSource('footer')">
+                    <option value="url">Google Drive / URL</option>
+                    <option value="file">Upload File</option>
+                </select>
+                <input type="text" id="footerUrl" class="form-input" placeholder="Image URL" value="https://lh3.googleusercontent.com/d/1S_3BUo0cwBgJX2eg8WysLoqoBlFUnlyz=w2000">
+                <input type="file" id="footerFile" class="form-input hidden" accept="image/*">
+            </div>
+            <button onclick="updateBranding()" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition">Update Branding</button>
+        </div>
+
+        <!-- Accordion: Header Info -->
+        <div class="mb-6 border rounded-lg p-4 bg-gray-50">
+            <h2 class="font-bold text-lg mb-3 border-b pb-2">2. Quotation Details</h2>
+            <div class="mb-2">
+                <label class="form-label">Date</label>
+                <input type="date" id="inputDate" class="form-input">
+            </div>
+            
+            <div class="space-y-2 mb-3">
+                <label class="form-label">To (Client)</label>
+                <input type="text" id="inputToName" class="form-input" placeholder="Name">
+                <input type="text" id="inputToPos" class="form-input" placeholder="Position">
+                <input type="text" id="inputToComp" class="form-input" placeholder="Company Name">
+            </div>
+
+            <div class="mb-2">
+                <label class="form-label">Subject</label>
+                <input type="text" id="inputSubject" class="form-input" value="Price Quotation From ROSHOD">
+            </div>
+
+            <div class="mb-2">
+                <label class="form-label">Opening Text</label>
+                <textarea id="inputOpening" class="form-input h-24">We are pleased to inform you that we are offering special prices to your premises from ROSHOD. Details and special price offers are mentioned below:</textarea>
+            </div>
+        </div>
+
+        <!-- Accordion: Table Data -->
+        <div class="mb-6 border rounded-lg p-4 bg-gray-50">
+            <h2 class="font-bold text-lg mb-3 border-b pb-2">3. Table Data</h2>
+            
+            <div class="mb-4">
+                <label class="form-label text-green-700">Import Excel (.xlsx)</label>
+                <input type="file" id="excelUpload" accept=".xlsx, .xls" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
+            </div>
+
+            <div class="flex gap-2 mb-3">
+                <button onclick="addRow()" class="bg-gray-200 px-3 py-1 text-sm rounded hover:bg-gray-300">Add Row</button>
+                <button onclick="addColumn()" class="bg-gray-200 px-3 py-1 text-sm rounded hover:bg-gray-300">Add Col</button>
+                <button onclick="resetTable()" class="bg-red-100 text-red-600 px-3 py-1 text-sm rounded hover:bg-red-200">Clear</button>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <input type="checkbox" id="enableTotal" class="w-4 h-4" checked onchange="calculateGrandTotal()">
+                <label for="enableTotal" class="text-sm font-medium">Calculate Grand Total</label>
+            </div>
+            <p class="text-xs text-gray-500 mt-1">Looks for columns with 'Total', 'Amount', or 'Price' to sum.</p>
+        </div>
+
+        <!-- Accordion: Footer Info -->
+        <div class="mb-6 border rounded-lg p-4 bg-gray-50">
+            <h2 class="font-bold text-lg mb-3 border-b pb-2">4. Terms & Signature</h2>
+            
+            <div class="mb-2">
+                <label class="form-label">Terms & Conditions</label>
+                <textarea id="inputTerms" class="form-input h-32"></textarea>
+            </div>
+
+            <div class="space-y-2">
+                <label class="form-label">Signature Block</label>
+                <input type="text" id="sigName" class="form-input" placeholder="Signatory Name">
+                <input type="text" id="sigPos" class="form-input" placeholder="Position">
+                <input type="text" id="sigComp" class="form-input" placeholder="Company">
+                <div class="mt-2">
+                    <label class="form-label">Signature Image (Optional)</label>
+                    <input type="file" id="sigFile" class="form-input" accept="image/*" onchange="updateSignatureImage()">
+                </div>
+            </div>
+        </div>
+
+        <button onclick="window.print()" class="w-full bg-indigo-600 text-white py-4 rounded-lg font-bold text-xl shadow-lg hover:bg-indigo-700 transition mb-10">
+            <i class="fas fa-print mr-2"></i> Print / Save as PDF
+        </button>
+    </div>
+
+    <!-- Main Content: Preview -->
+    <div id="main-content" class="flex-1 h-full overflow-y-auto bg-gray-200 p-8 flex justify-center">
+        
+        <!-- A4 Page Container -->
+        <div class="a4-page relative flex flex-col">
+            
+            <!-- Fixed Header for Print (Repeats) -->
+<div id="print-header"
+     class="hidden print:flex justify-between items-start px-[1.5cm] pt-4 w-full">
+
+    <!-- Logo -->
+    <img id="print-logo-img"
+         src=""
+         alt="Logo"
+         class="h-20 object-contain w-auto max-w-[200px]">
+
+    <!-- Header Banner -->
+    <img id="print-header-img"
+         src=""
+         alt="Header"
+         class="h-[4.39cm] w-[13.3cm] object-cover">
+</div>
+
+
+            <!-- Header Shim for Screen (Visual only) -->
+            <div class="screen-header-shim flex justify-between items-start mb-8 print:hidden">
+                <img id="screen-logo-img" src="" alt="Logo" class="h-20 object-contain w-auto max-w-[200px]">
+                <img id="screen-header-img" src="" alt="Header" class="h-[4.39cm] w-[13.3cm] object-cover">
+            </div>
+
+            <!-- Document Content -->
+            <div id="print-body" class="flex-grow">
+                
+                <!-- Date -->
+                <div class="text-left font-bold mb-2" id="dispDate"></div>
+
+                <!-- Recipient -->
+                <div class="mb-6">
+                    <div class="font-bold">TO:</div>
+                    <div id="dispToName" class="font-semibold"></div>
+                    <div id="dispToPos"></div>
+                    <div id="dispToComp"></div>
+                </div>
+
+                <!-- Subject -->
+                <div class="mb-4">
+                    <span class="font-bold">Subject: </span>
+                    <span id="dispSubject" class="font-bold underline decoration-1 underline-offset-2"></span>
+                </div>
+
+                <!-- Opening -->
+                <div class="mb-4">
+                    <p class="mb-2">Dear Sir,</p>
+                    <p id="dispOpening" class="text-justify"></p>
+                </div>
+
+                <!-- Dynamic Table -->
+                <div class="overflow-x-auto mb-6">
+                    <table id="mainTable" class="quote-table">
+                        <thead>
+                            <tr id="tableHeadRow">
+                                <th>SL</th>
+                                <th>Description</th>
+                                <th>Unit</th>
+                                <th>Qty</th>
+                                <th>Unit Price</th>
+                                <th>Total Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <!-- JS generates rows here -->
+                        </tbody>
+                        <tfoot id="tableFoot" class="hidden">
+                            <tr>
+                                <td colspan="5" class="text-right font-bold bg-gray-100">Grand Total:</td>
+                                <td id="grandTotalVal" class="font-bold text-center bg-gray-100">0.00</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                    <div id="emptyState" class="text-center text-gray-400 text-sm py-4 hidden">
+                        No table data. Upload Excel or Add Row.
+                    </div>
+                </div>
+
+                <!-- Terms -->
+                <div class="mb-8 text-sm">
+                    <h3 class="font-bold underline mb-2">Terms and Conditions:</h3>
+                    <div id="dispTerms" class="rich-text pl-4 border-l-2 border-gray-300"></div>
+                </div>
+
+                <!-- Signature -->
+                <div class="mt-auto pt-4 break-inside-avoid">
+                    <div class="mb-2">Thanks & Regards,</div>
+                    <div class="mt-4 mb-2 h-16 w-32 relative">
+                        <img id="dispSigImg" src="" class="h-full w-full object-contain hidden" alt="Signature">
+                    </div>
+                    <div id="dispSigName" class="font-bold"></div>
+                    <div id="dispSigPos" class="text-sm"></div>
+                    <div id="dispSigComp" class="text-sm font-bold"></div>
+                </div>
+            </div>
+
+            <!-- Fixed Footer for Print -->
+            <div id="print-footer" class="hidden print:block">
+                 <img id="print-footer-img" src="" class="w-full h-full">
+            </div>
+
+            <!-- Footer Shim for Screen -->
+            <div class="screen-footer-shim w-full print:hidden">
+                <img id="screen-footer-img" src="" class="w-full h-full">
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // --- State Management & Defaults ---
+        const defaultTerms = `Price may vary based on the market price and Quotation validity: 05 days.
+Delivery: After confirming the order, delivery will be done at one of your factory premises within 7 days.
+Additional delivery charge applicable for multiple factories.
+80% Advance payment and 20% on delivery date.
+Mode of Payment: Pay-Order, A/C payee cheque, BEFTN in favor of “ROSHOD.” A/C No: 1263963607001, The City Bank, Routing Number 225260438.
+VAT & TAX: Including VAT & Excluding Tax.`;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            // Set Default Date
+            document.getElementById('inputDate').valueAsDate = new Date();
+            
+            // Set Default Terms
+            document.getElementById('inputTerms').value = defaultTerms;
+
+            // Initial Render of Branding
+            updateBranding();
+            
+            // Listeners for live updates
+            setupInputListeners();
+
+            // Initial Table Layout (Empty)
+            // If we wanted a default table:
+            // renderTable(['Item', 'Description', 'Qty', 'Unit Price', 'Total'], [['Widget A', 'High quality', 10, 100, 1000]]);
+            renderTable(['SL', 'Description', 'Unit', 'Qty', 'Unit Price', 'Total Amount'], []);
+        });
+
+        // --- Branding Logic ---
+        function toggleSource(type) {
+            const select = document.getElementById(type + 'Type');
+            const urlInput = document.getElementById(type + 'Url');
+            const fileInput = document.getElementById(type + 'File');
+            
+            if (select.value === 'url') {
+                urlInput.classList.remove('hidden');
+                fileInput.classList.add('hidden');
+            } else {
+                urlInput.classList.add('hidden');
+                fileInput.classList.remove('hidden');
+            }
+        }
+
+        function updateBranding() {
+            setImgSource('logo');
+            setImgSource('header');
+            setImgSource('footer');
+        }
+
+        function setImgSource(type) {
+            const method = document.getElementById(type + 'Type').value;
+            const screenImg = document.getElementById('screen-' + type + '-img');
+            const printImg = document.getElementById('print-' + type + '-img');
+
+            if (method === 'url') {
+                const url = document.getElementById(type + 'Url').value;
+                screenImg.src = url;
+                printImg.src = url;
+            } else {
+                const fileInput = document.getElementById(type + 'File');
+                if (fileInput.files && fileInput.files[0]) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        screenImg.src = e.target.result;
+                        printImg.src = e.target.result;
+                    }
+                    reader.readAsDataURL(fileInput.files[0]);
+                }
+            }
+        }
+
+        function updateSignatureImage() {
+            const input = document.getElementById('sigFile');
+            const img = document.getElementById('dispSigImg');
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    img.src = e.target.result;
+                    img.classList.remove('hidden');
+                }
+                reader.readAsDataURL(input.files[0]);
+            } else {
+                img.classList.add('hidden');
+            }
+        }
+
+        // --- Live Preview Listeners ---
+        function setupInputListeners() {
+            const mappings = [
+                { id: 'inputDate', target: 'dispDate', format: (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '' },
+                { id: 'inputToName', target: 'dispToName' },
+                { id: 'inputToPos', target: 'dispToPos' },
+                { id: 'inputToComp', target: 'dispToComp' },
+                { id: 'inputSubject', target: 'dispSubject' },
+                { id: 'inputOpening', target: 'dispOpening' },
+                { id: 'inputTerms', target: 'dispTerms' },
+                { id: 'sigName', target: 'dispSigName' },
+                { id: 'sigPos', target: 'dispSigPos' },
+                { id: 'sigComp', target: 'dispSigComp' },
+            ];
+
+            mappings.forEach(map => {
+                const input = document.getElementById(map.id);
+                const target = document.getElementById(map.target);
+                
+                const update = () => {
+                    target.textContent = map.format ? map.format(input.value) : input.value;
+                };
+                
+                input.addEventListener('input', update);
+                update(); // Initial call
+            });
+        }
+
+        // --- Excel & Table Logic ---
+        document.getElementById('excelUpload').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, {type: 'array'});
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet, {header: 1}); // Array of Arrays
+                
+                if (jsonData.length > 0) {
+                    const headers = jsonData[0];
+                    const rows = jsonData.slice(1);
+                    renderTable(headers, rows);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        function renderTable(headers, rows) {
+            const thead = document.getElementById('tableHeadRow');
+            const tbody = document.getElementById('tableBody');
+            
+            thead.innerHTML = '';
+            tbody.innerHTML = '';
+
+            // Render Headers
+            headers.forEach((h, index) => {
+                const th = document.createElement('th');
+                th.contentEditable = true;
+                th.textContent = h || `Col ${index+1}`;
+                th.onblur = calculateGrandTotal; // Recalc if header changes (might affect detection)
+                
+                // Add delete col button on hover logic? Too complex for single file cleanly.
+                // Instead, simple right click or just double click to edit.
+                thead.appendChild(th);
+            });
+
+            // Render Rows
+            rows.forEach(row => {
+                const tr = document.createElement('tr');
+                // Ensure row has enough cells matching header
+                for(let i=0; i<headers.length; i++) {
+                    const td = document.createElement('td');
+                    td.contentEditable = true;
+                    td.textContent = row[i] !== undefined ? row[i] : '';
+                    td.addEventListener('input', calculateGrandTotal); // Live calc
+                    tr.appendChild(td);
+                }
+                
+                // Delete Row Button (Only visible on hover/non-print)
+                const delBtn = document.createElement('td');
+                delBtn.className = 'no-print w-8 text-center border-0 bg-transparent cursor-pointer text-red-400 hover:text-red-600';
+                delBtn.innerHTML = '<i class="fas fa-trash"></i>';
+                delBtn.onclick = function() { tr.remove(); calculateGrandTotal(); };
+                tr.appendChild(delBtn);
+
+                tbody.appendChild(tr);
+            });
+
+            if(rows.length === 0) {
+                document.getElementById('emptyState').classList.remove('hidden');
+            } else {
+                document.getElementById('emptyState').classList.add('hidden');
+            }
+
+            calculateGrandTotal();
+        }
+
+        function addRow() {
+            const tbody = document.getElementById('tableBody');
+            const colCount = document.getElementById('tableHeadRow').children.length;
+            const tr = document.createElement('tr');
+            
+            for(let i=0; i<colCount; i++) {
+                const td = document.createElement('td');
+                td.contentEditable = true;
+                td.addEventListener('input', calculateGrandTotal);
+                tr.appendChild(td);
+            }
+
+            const delBtn = document.createElement('td');
+            delBtn.className = 'no-print w-8 text-center border-0 bg-transparent cursor-pointer text-red-400 hover:text-red-600';
+            delBtn.innerHTML = '<i class="fas fa-trash"></i>';
+            delBtn.onclick = function() { tr.remove(); calculateGrandTotal(); };
+            tr.appendChild(delBtn);
+
+            tbody.appendChild(tr);
+            document.getElementById('emptyState').classList.add('hidden');
+        }
+
+        function addColumn() {
+            const thead = document.getElementById('tableHeadRow');
+            const tbody = document.getElementById('tableBody');
+
+            // Add Header
+            const th = document.createElement('th');
+            th.contentEditable = true;
+            th.textContent = 'New Col';
+            thead.appendChild(th);
+
+            // Add Cell to every row
+            Array.from(tbody.children).forEach(tr => {
+                // Insert before the delete button (last child)
+                const td = document.createElement('td');
+                td.contentEditable = true;
+                td.addEventListener('input', calculateGrandTotal);
+                tr.insertBefore(td, tr.lastChild);
+            });
+        }
+
+        function resetTable() {
+            if(confirm('Clear current table?')) {
+                renderTable(['Item', 'Qty', 'Price', 'Total'], []);
+            }
+        }
+
+        // --- Grand Total Logic ---
+        function calculateGrandTotal() {
+            const enabled = document.getElementById('enableTotal').checked;
+            const tfoot = document.getElementById('tableFoot');
+            const totalDisplay = document.getElementById('grandTotalVal');
+
+            if (!enabled) {
+                tfoot.classList.add('hidden');
+                return;
+            }
+
+            const headerRow = document.getElementById('tableHeadRow');
+            const headers = Array.from(headerRow.children).map(th => th.textContent.toLowerCase());
+            const totalCols = headers.length;
+            
+            // Heuristic to find the Total column
+            let colIndex = headers.findIndex(h => h.includes('total') || h.includes('amount') || h.includes('price'));
+            
+            // If heuristics fail, default to the last column
+            if (colIndex === -1 && totalCols > 0) colIndex = totalCols - 1;
+
+            if (colIndex !== -1) {
+                let sum = 0;
+                const tbody = document.getElementById('tableBody');
+                Array.from(tbody.children).forEach(tr => {
+                    const cells = tr.children;
+                    // Note: Cells includes the hidden 'delete' cell in DOM, but header doesn't have it initially usually?
+                    // Actually delete button is a td. Headers are th.
+                    // We need to be careful about index alignment. 
+                    // Our renderTable adds a 'delete' TD at the end of rows, but typically no TH for it unless added?
+                    // Actually renderTable does NOT add a TH for the delete button, but DOES add a TD.
+                    // So cell[colIndex] is valid.
+                    
+                    if (cells[colIndex]) {
+                        const raw = cells[colIndex].textContent;
+                        // Allow negative numbers, remove currency symbols
+                        const clean = raw.replace(/[^0-9.-]+/g, ""); 
+                        const val = parseFloat(clean);
+                        if (!isNaN(val)) sum += val;
+                    }
+                });
+
+                totalDisplay.textContent = sum.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                tfoot.classList.remove('hidden');
+                
+                // Adjust colspan to align borders correctly
+                // Row structure: [Label Cell] [Value Cell]
+                // Label Cell spans from 0 to colIndex (exclusive)
+                // Value Cell is at colIndex
+                // If there are columns AFTER colIndex, we technically need another spacer or extend the Value cell.
+                // Let's make the value cell extend to the end.
+                
+                const labelCell = tfoot.firstElementChild.firstElementChild;
+                const valueCell = document.getElementById('grandTotalVal');
+                
+                // Ensure colIndex is at least 1 for the label to exist
+                const safeColIndex = Math.max(1, colIndex);
+                
+                labelCell.colSpan = safeColIndex;
+                
+                // Value cell spans the rest
+                // Total columns in visual table = header count.
+                // Rows have header count + 1 (delete button).
+                // But Footer doesn't have delete button.
+                valueCell.colSpan = totalCols - safeColIndex;
+                
+            } else {
+                tfoot.classList.add('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
