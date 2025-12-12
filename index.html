@@ -3,395 +3,439 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dynamic Price Quotation Generator</title>
+    <title>Professional Quote Generator</title>
     
-    <!-- Tailwind CSS -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     
-    <!-- SheetJS for Excel Parsing -->
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     
-    <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
-        /* A4 Paper Styling for Screen */
+        :root {
+            --primary: #4f46e5; /* Indigo 600 */
+            --bg-desk: #f8fafc; /* Slate 50 */
+            --paper-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-desk);
+        }
+
+        /* --- Scrollbar Styling --- */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #d1d5db;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #9ca3af;
+        }
+
+        /* --- UI Component Styling --- */
+        .sidebar-card {
+            background: white;
+            border-radius: 0.75rem;
+            border: 1px solid #e5e7eb;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+        }
+        
+        .sidebar-header {
+            background: #f9fafb;
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid #e5e7eb;
+            font-weight: 600;
+            color: #1f2937;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 0.05em;
+        }
+
+        .sidebar-body {
+            padding: 1.25rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .modern-input {
+            width: 100%;
+            padding: 0.625rem 0.875rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            color: #1f2937;
+            transition: all 0.2s;
+            background-color: #fff;
+        }
+        
+        .modern-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
+        }
+
+        .modern-label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: #4b5563;
+            margin-bottom: 0.35rem;
+            text-transform: none;
+            letter-spacing: 0;
+        }
+
+        .btn-toolbar {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .btn-action {
+            background: #f3f4f6;
+            color: #4b5563;
+            padding: 0.625rem 1rem;
+            border-radius: 0.5rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            border: 1px solid #e5e7eb;
+        }
+        .btn-action:hover {
+            background: #e5e7eb;
+            color: #1f2937;
+        }
+
+        /* --- Paper Preview Styling --- */
         .a4-page {
             width: 210mm;
             min-height: 297mm;
             background: white;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-            margin: 0 auto;
+            margin: 2rem auto;
             position: relative;
-            padding: 15mm 15mm 15mm 15mm; /* Padding for content inside margins */
+            padding: 15mm; 
             box-sizing: border-box; 
-            overflow: hidden; /* Prevent spill on screen */
+            overflow: hidden; 
+            box-shadow: var(--paper-shadow);
+            transform-origin: top center;
         }
 
-        /* Input Styling */
-        .form-input {
-            width: 100%;
-            padding: 0.5rem;
-            border: 1px solid #e2e8f0;
-            border-radius: 0.375rem;
-            font-size: 0.875rem;
-            margin-bottom: 0.5rem;
-        }
-        .form-label {
-            display: block;
-            font-size: 0.75rem;
-            font-weight: 700;
-            color: #4a5568;
-            margin-bottom: 0.25rem;
-        }
-        
-        /* Table Styling */
+        /* --- Table Styling (Refined) --- */
         .quote-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 1rem;
-            margin-bottom: 1rem;
-            font-size: 12px;
+            margin-top: 1.5rem;
+            margin-bottom: 1.5rem;
+            font-size: 13px;
         }
         .quote-table th {
-            background-color: #f3f4f6;
-            border: 1px solid #000;
-            padding: 8px;
+            background-color: #f9fafb;
+            color: #374151;
+            border: 1px solid #e5e7eb;
+            padding: 12px 8px;
             text-align: center;
-            font-weight: bold;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
         }
         .quote-table td {
-            border: 1px solid #000;
-            padding: 6px;
+            border: 1px solid #e5e7eb;
+            padding: 8px;
+            color: #374151;
+            vertical-align: top;
         }
         .quote-table td[contenteditable="true"]:hover {
-            background-color: #f0f9ff;
+            background-color: #f5f3ff;
             cursor: text;
         }
-        .quote-table input {
-            width: 100%;
-            border: none;
-            background: transparent;
-            text-align: inherit;
-        }
 
-        /* Print Media Query - CRITICAL */
-        @media print {
-            @page {
-                size: A4;
-                margin: 0; /* We handle margins via padding/fixed elements */
-            }
-            
-            body {
-                background: white;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-
-            /* Hide Sidebar and UI controls */
-            #sidebar, #controls, .no-print {
-                display: none !important;
-            }
-
-            /* Main Container Full Width */
-            #main-content {
-                width: 100%;
-                margin: 0;
-                padding: 0;
-                height: auto;
-                overflow: visible;
-            }
-
-            /* Reset A4 Container for Print */
-            .a4-page {
-                width: 100%;
-                height: auto;
-                min-height: auto;
-                box-shadow: none;
-                margin: 0;
-                padding: 0; /* Padding handled by fixed header spacing */
-                border: none;
-                overflow: visible;
-            }
-
-            /* Fixed Header/Footer Logic */
-            #print-header {
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 5cm; /* Space for logo and banner */
-                z-index: 1000;
-                background: white;
-            }
-
-            #print-footer {
-                position: fixed;
-                bottom: 0;
-                left: 0;
-                width: 100%;
-                height: 1.5cm; /* Adjust based on footer image height */
-                z-index: 1000;
-                background: white;
-            }
-
-            /* Content Spacing for Fixed Elements */
-            /* Using thead/tfoot for table repetition is good, but for full page layout: */
-            #print-body {
-                margin-top: 5cm; /* Match header height */
-                margin-bottom: 2cm; /* Match footer height */
-                padding-left: 1.5cm;
-                padding-right: 1.5cm;
-            }
-
-            /* Ensure table rows don't break awkwardly */
-            tr {
-                page-break-inside: avoid;
-            }
-        }
-
-        /* Screen-only representations of header/footer */
-        .screen-header-shim {
-            height: 5cm;
-            position: relative;
-        }
-        .screen-footer-shim {
-            height: 1.5cm;
-            margin-top: auto;
-        }
-
-        /* Rich Text Area */
         .rich-text {
             white-space: pre-wrap;
-            line-height: 1.5;
+            line-height: 1.6;
+            color: #4b5563;
+        }
+
+        /* --- PRINT STYLING (The Logic) --- */
+        @media print {
+            @page { size: A4; margin: 0; }
+            body { margin: 0; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            #sidebar, #controls, .no-print, .screen-only-shim { display: none !important; }
+            #main-content { width: 100%; margin: 0; padding: 0; height: auto; overflow: visible; display: block; }
+            .a4-page { width: 100%; height: auto; min-height: auto; box-shadow: none; margin: 0; padding: 0; border: none; overflow: visible; display: block; }
+            
+            /* Visual Elements */
+            #print-fixed-header { position: fixed; top: 0; left: 0; width: 100%; height: 5cm; z-index: 1000; background: white; }
+            #print-fixed-header > div { padding: 4mm 1.5cm 0 1.5cm; display: flex; justify-content: space-between; align-items: start; }
+            #print-fixed-footer { position: fixed; bottom: 0; left: 0; width: 100%; height: 1.5cm; z-index: 1000; background: white; }
+            
+            /* Layout Table */
+            #print-layout-table { width: 100%; border-collapse: collapse; }
+            #print-layout-table thead { display: table-header-group; }
+            #print-layout-table tfoot { display: table-footer-group; }
+            .header-spacer { height: 5.5cm; } 
+            .footer-spacer { height: 2.0cm; }
+            .content-cell { padding-left: 1.5cm; padding-right: 1.5cm; vertical-align: top; }
+            tr { page-break-inside: avoid; }
+            .keep-together { page-break-inside: avoid; }
+
+            /* FIX: Ensure hidden footer stays hidden in print when calculation is disabled */
+            .print-hidden-footer {
+                display: none !important;
+            }
         }
     </style>
 </head>
-<body class="bg-gray-100 h-screen overflow-hidden flex text-gray-800 font-sans">
+<body class="h-screen overflow-hidden flex text-slate-800">
 
-    <!-- Sidebar: Controls -->
-    <div id="sidebar" class="w-1/3 min-w-[350px] h-full bg-white border-r border-gray-300 overflow-y-auto p-6 shadow-xl z-20">
-        <h1 class="text-2xl font-bold mb-6 text-blue-700"><i class="fas fa-file-invoice mb-2"></i> Quote Generator</h1>
-
-        <!-- Accordion: Branding -->
-        <div class="mb-6 border rounded-lg p-4 bg-gray-50">
-            <h2 class="font-bold text-lg mb-3 border-b pb-2">1. Branding</h2>
-            
-            <div class="mb-3">
-                <label class="form-label">Logo Source</label>
-                <select id="logoType" class="form-input" onchange="toggleSource('logo')">
-                    <option value="url">Google Drive / URL</option>
-                    <option value="file">Upload File</option>
-                </select>
-                <input type="text" id="logoUrl" class="form-input" placeholder="Image URL" value="https://lh3.googleusercontent.com/d/1fwtQu3Fqq9FQs-QoTYEkhm-Vz3BPryAQ=w1000">
-                <input type="file" id="logoFile" class="form-input hidden" accept="image/*">
-            </div>
-
-            <div class="mb-3">
-                <label class="form-label">Header Banner Source</label>
-                <select id="headerType" class="form-input" onchange="toggleSource('header')">
-                    <option value="url">Google Drive / URL</option>
-                    <option value="file">Upload File</option>
-                </select>
-                <input type="text" id="headerUrl" class="form-input" placeholder="Image URL" value="https://lh3.googleusercontent.com/d/1lQI7gYEz3IlGbu2C4wWbwMRlcl05qy0w=w1000">
-                <input type="file" id="headerFile" class="form-input hidden" accept="image/*">
-            </div>
-
-            <div class="mb-3">
-                <label class="form-label">Footer Source</label>
-                <select id="footerType" class="form-input" onchange="toggleSource('footer')">
-                    <option value="url">Google Drive / URL</option>
-                    <option value="file">Upload File</option>
-                </select>
-                <input type="text" id="footerUrl" class="form-input" placeholder="Image URL" value="https://lh3.googleusercontent.com/d/1S_3BUo0cwBgJX2eg8WysLoqoBlFUnlyz=w2000">
-                <input type="file" id="footerFile" class="form-input hidden" accept="image/*">
-            </div>
-            <button onclick="updateBranding()" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition">Update Branding</button>
+    <div id="sidebar" class="w-[400px] h-full bg-white border-r border-slate-200 flex flex-col z-20 shadow-xl">
+        
+        <div class="p-6 border-b border-slate-100">
+            <h1 class="text-2xl font-bold text-indigo-700 flex items-center gap-3">
+                <i class="fas fa-file-invoice-dollar"></i> ROSHOD Quote Generator
+            </h1>
+            <p class="text-xs text-slate-400 mt-1">Professional Document Builder</p>
         </div>
 
-        <!-- Accordion: Header Info -->
-        <div class="mb-6 border rounded-lg p-4 bg-gray-50">
-            <h2 class="font-bold text-lg mb-3 border-b pb-2">2. Quotation Details</h2>
-            <div class="mb-2">
-                <label class="form-label">Date</label>
-                <input type="date" id="inputDate" class="form-input">
-            </div>
+        <div class="flex-1 overflow-y-auto p-6 bg-slate-50">
             
-            <div class="space-y-2 mb-3">
-                <label class="form-label">To (Client)</label>
-                <input type="text" id="inputToName" class="form-input" placeholder="Name">
-                <input type="text" id="inputToPos" class="form-input" placeholder="Position">
-                <input type="text" id="inputToComp" class="form-input" placeholder="Company Name">
-            </div>
-
-            <div class="mb-2">
-                <label class="form-label">Subject</label>
-                <input type="text" id="inputSubject" class="form-input" value="Price Quotation From ROSHOD">
-            </div>
-
-            <div class="mb-2">
-                <label class="form-label">Opening Text</label>
-                <textarea id="inputOpening" class="form-input h-24">We are pleased to inform you that we are offering special prices to your premises from ROSHOD. Details and special price offers are mentioned below:</textarea>
-            </div>
-        </div>
-
-        <!-- Accordion: Table Data -->
-        <div class="mb-6 border rounded-lg p-4 bg-gray-50">
-            <h2 class="font-bold text-lg mb-3 border-b pb-2">3. Table Data</h2>
-            
-            <div class="mb-4">
-                <label class="form-label text-green-700">Import Excel (.xlsx)</label>
-                <input type="file" id="excelUpload" accept=".xlsx, .xls" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
-            </div>
-
-            <div class="flex gap-2 mb-3">
-                <button onclick="addRow()" class="bg-gray-200 px-3 py-1 text-sm rounded hover:bg-gray-300">Add Row</button>
-                <button onclick="addColumn()" class="bg-gray-200 px-3 py-1 text-sm rounded hover:bg-gray-300">Add Col</button>
-                <button onclick="resetTable()" class="bg-red-100 text-red-600 px-3 py-1 text-sm rounded hover:bg-red-200">Clear</button>
-            </div>
-
-            <div class="flex items-center gap-2">
-                <input type="checkbox" id="enableTotal" class="w-4 h-4" checked onchange="calculateGrandTotal()">
-                <label for="enableTotal" class="text-sm font-medium">Calculate Grand Total</label>
-            </div>
-            <p class="text-xs text-gray-500 mt-1">Looks for columns with 'Total', 'Amount', or 'Price' to sum.</p>
-        </div>
-
-        <!-- Accordion: Footer Info -->
-        <div class="mb-6 border rounded-lg p-4 bg-gray-50">
-            <h2 class="font-bold text-lg mb-3 border-b pb-2">4. Terms & Signature</h2>
-            
-            <div class="mb-2">
-                <label class="form-label">Terms & Conditions</label>
-                <textarea id="inputTerms" class="form-input h-32"></textarea>
-            </div>
-
-            <div class="space-y-2">
-                <label class="form-label">Signature Block</label>
-                <input type="text" id="sigName" class="form-input" placeholder="Signatory Name">
-                <input type="text" id="sigPos" class="form-input" placeholder="Position">
-                <input type="text" id="sigComp" class="form-input" placeholder="Company">
-                <div class="mt-2">
-                    <label class="form-label">Signature Image (Optional)</label>
-                    <input type="file" id="sigFile" class="form-input" accept="image/*" onchange="updateSignatureImage()">
+            <div class="sidebar-card">
+                <div class="sidebar-header"><i class="fas fa-paint-brush text-indigo-500"></i> 1. Branding Assets</div>
+                <div class="sidebar-body">
+                    <div class="form-group">
+                        <label class="modern-label">Logo</label>
+                        <div class="flex gap-2">
+                            <select id="logoType" class="modern-input w-1/3" onchange="toggleSource('logo')">
+                                <option value="url">URL</option>
+                                <option value="file">File</option>
+                            </select>
+                            <input type="text" id="logoUrl" class="modern-input flex-1" placeholder="Image URL (https://...)" value="https://lh3.googleusercontent.com/d/1fwtQu3Fqq9FQs-QoTYEkhm-Vz3BPryAQ=w1000">
+                            <input type="file" id="logoFile" class="modern-input hidden flex-1" accept="image/*">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="modern-label">Header Banner</label>
+                        <div class="flex gap-2">
+                            <select id="headerType" class="modern-input w-1/3" onchange="toggleSource('header')">
+                                <option value="url">URL</option>
+                                <option value="file">File</option>
+                            </select>
+                            <input type="text" id="headerUrl" class="modern-input flex-1" placeholder="Image URL (https://...)" value="https://lh3.googleusercontent.com/d/1lQI7gYEz3IlGbu2C4wWbwMRlcl05qy0w=w1000">
+                            <input type="file" id="headerFile" class="modern-input hidden flex-1" accept="image/*">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="modern-label">Footer Banner</label>
+                        <div class="flex gap-2">
+                            <select id="footerType" class="modern-input w-1/3" onchange="toggleSource('footer')">
+                                <option value="url">URL</option>
+                                <option value="file">File</option>
+                            </select>
+                            <input type="text" id="footerUrl" class="modern-input flex-1" placeholder="Image URL (https://...)" value="https://lh3.googleusercontent.com/d/1S_3BUo0cwBgJX2eg8WysLoqoBlFUnlyz=w2000">
+                            <input type="file" id="footerFile" class="modern-input hidden flex-1" accept="image/*">
+                        </div>
+                    </div>
+                    <button onclick="updateBranding()" class="w-full bg-slate-700 text-white py-2 rounded-lg text-sm font-medium hover:bg-slate-600 transition">Apply Branding Updates</button>
                 </div>
             </div>
+
+            <div class="sidebar-card">
+                <div class="sidebar-header"><i class="fas fa-list-alt text-indigo-500"></i> 2. Quotation Details</div>
+                <div class="sidebar-body">
+                    <div class="form-group">
+                        <label class="modern-label">Date</label>
+                        <input type="date" id="inputDate" class="modern-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="modern-label">Recipient Details</label>
+                        <input type="text" id="inputToName" class="modern-input mb-2" placeholder="Full Name">
+                        <input type="text" id="inputToPos" class="modern-input mb-2" placeholder="Job Title/Position">
+                        <input type="text" id="inputToComp" class="modern-input" placeholder="Company Name">
+                    </div>
+                    <div class="form-group">
+                        <label class="modern-label">Subject Line</label>
+                        <input type="text" id="inputSubject" class="modern-input" value="Price Quotation From ROSHOD">
+                    </div>
+                    <div class="form-group">
+                        <label class="modern-label">Opening Paragraph</label>
+                        <textarea id="inputOpening" class="modern-input h-24 resize-none text-sm">We are pleased to inform you that we are offering special prices to your premises from ROSHOD. Details and special price offers are mentioned below:</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-card">
+                <div class="sidebar-header"><i class="fas fa-clipboard-list text-indigo-500"></i> 3. Line Items & Calculations</div>
+                <div class="sidebar-body">
+                    
+                    <label class="modern-label">Data Import/Manual Entry</label>
+                    <div class="relative group mb-3">
+                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                            <i class="fas fa-file-excel text-green-600"></i>
+                        </div>
+                        <input type="file" id="excelUpload" accept=".xlsx, .xls" class="modern-input pl-10 text-sm file:mr-4 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-xs file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                    </div>
+                    
+                    <div class="btn-toolbar">
+                        <button onclick="addRow()" class="btn-action flex-1 justify-center"><i class="fas fa-plus text-xs"></i> Add Row</button>
+                        <button onclick="addColumn()" class="btn-action flex-1 justify-center"><i class="fas fa-columns text-xs"></i> Add Column</button>
+                        <button onclick="resetTable()" class="btn-action bg-red-50 text-red-600 border-red-200 hover:bg-red-100"><i class="fas fa-trash"></i></button>
+                    </div>
+
+                    <div class="mt-4 flex items-center gap-2 p-3 bg-indigo-50 rounded-lg border border-indigo-200">
+                        <input type="checkbox" id="enableTotal" class="w-4 h-4 text-indigo-600 border-indigo-300 rounded focus:ring-indigo-500" checked onchange="calculateGrandTotal()">
+                        <label for="enableTotal" class="text-sm font-medium text-indigo-800">Enable Grand Total Calculation</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-card">
+                <div class="sidebar-header"><i class="fas fa-handshake text-indigo-500"></i> 4. Terms & Signature</div>
+                <div class="sidebar-body">
+                    <div class="form-group">
+                        <label class="modern-label">Terms & Conditions</label>
+                        <textarea id="inputTerms" class="modern-input h-32 resize-none text-xs"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="modern-label">Signatory Details</label>
+                        <input type="text" id="sigName" class="modern-input mb-2" placeholder="Signatory Name">
+                        <input type="text" id="sigPos" class="modern-input mb-2" placeholder="Position">
+                        <input type="text" id="sigComp" class="modern-input" placeholder="Company">
+                        <div class="mt-3">
+                            <label class="modern-label">Upload Signature Image</label>
+                            <input type="file" id="sigFile" class="modern-input text-xs" accept="image/*" onchange="updateSignatureImage()">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="window.print()" class="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold text-lg shadow-lg hover:bg-indigo-700 transition flex items-center justify-center gap-2 mb-6">
+                <i class="fas fa-print"></i> Print / Save as PDF
+            </button>
+
+            <div class="h-6"></div>
         </div>
 
-        <button onclick="window.print()" class="w-full bg-indigo-600 text-white py-4 rounded-lg font-bold text-xl shadow-lg hover:bg-indigo-700 transition mb-10">
-            <i class="fas fa-print mr-2"></i> Print / Save as PDF
-        </button>
     </div>
 
-    <!-- Main Content: Preview -->
-    <div id="main-content" class="flex-1 h-full overflow-y-auto bg-gray-200 p-8 flex justify-center">
+    <div id="main-content" class="flex-1 h-full overflow-y-auto p-8 flex justify-center">
         
-        <!-- A4 Page Container -->
         <div class="a4-page relative flex flex-col">
-            
-            <!-- Fixed Header for Print (Repeats) -->
-<div id="print-header"
-     class="hidden print:flex justify-between items-start px-[1.5cm] pt-4 w-full">
 
-    <!-- Logo -->
-    <img id="print-logo-img"
-         src=""
-         alt="Logo"
-         class="h-20 object-contain w-auto max-w-[200px]">
+            <div id="print-fixed-header" class="hidden print:block">
+                <div>
+                    <img id="print-logo-img" src="" alt="Logo" class="h-20 object-contain w-auto max-w-[200px]">
+                    <img id="print-header-img" src="" alt="Header" class="h-[4.39cm] w-[13.3cm] object-cover">
+                </div>
+            </div>
 
-    <!-- Header Banner -->
-    <img id="print-header-img"
-         src=""
-         alt="Header"
-         class="h-[4.39cm] w-[13.3cm] object-cover">
-</div>
+            <div id="print-fixed-footer" class="hidden print:block">
+                 <img id="print-footer-img" src="" class="w-full h-full">
+            </div>
 
-
-            <!-- Header Shim for Screen (Visual only) -->
-            <div class="screen-header-shim flex justify-between items-start mb-8 print:hidden">
+            <div class="screen-only-shim flex justify-between items-start mb-8 print:hidden">
                 <img id="screen-logo-img" src="" alt="Logo" class="h-20 object-contain w-auto max-w-[200px]">
                 <img id="screen-header-img" src="" alt="Header" class="h-[4.39cm] w-[13.3cm] object-cover">
             </div>
 
-            <!-- Document Content -->
-            <div id="print-body" class="flex-grow">
+            <table id="print-layout-table">
+                <thead class="hidden print:table-header-group">
+                    <tr><td class="header-spacer"></td></tr>
+                </thead>
                 
-                <!-- Date -->
-                <div class="text-left font-bold mb-2" id="dispDate"></div>
+                <tbody>
+                    <tr>
+                        <td class="content-cell">
+                            
+                            <div class="text-left font-semibold mb-2 text-sm text-slate-700" id="dispDate"></div>
 
-                <!-- Recipient -->
-                <div class="mb-6">
-                    <div class="font-bold">TO:</div>
-                    <div id="dispToName" class="font-semibold"></div>
-                    <div id="dispToPos"></div>
-                    <div id="dispToComp"></div>
-                </div>
+                            <div class="mb-6 text-slate-800">
+                                <div class="font-bold text-xs text-indigo-600 uppercase tracking-wider mb-1">TO:</div>
+                                <div id="dispToName" class="font-bold text-lg"></div>
+                                <div id="dispToPos" class="text-sm text-slate-600"></div>
+                                <div id="dispToComp" class="text-sm font-semibold text-slate-600"></div>
+                            </div>
 
-                <!-- Subject -->
-                <div class="mb-4">
-                    <span class="font-bold">Subject: </span>
-                    <span id="dispSubject" class="font-bold underline decoration-1 underline-offset-2"></span>
-                </div>
+                            <div class="mb-4 text-slate-800">
+                                <span class="font-bold">Subject: </span>
+                                <span id="dispSubject" class="font-bold underline decoration-1 underline-offset-4 decoration-indigo-400"></span>
+                            </div>
 
-                <!-- Opening -->
-                <div class="mb-4">
-                    <p class="mb-2">Dear Sir,</p>
-                    <p id="dispOpening" class="text-justify"></p>
-                </div>
+                            <div class="mb-6 text-slate-700 leading-relaxed text-sm">
+                                <p class="mb-2">Dear Sir,</p>
+                                <p id="dispOpening" class="text-justify"></p>
+                            </div>
 
-                <!-- Dynamic Table -->
-                <div class="overflow-x-auto mb-6">
-                    <table id="mainTable" class="quote-table">
-                        <thead>
-                            <tr id="tableHeadRow">
-                                <th>SL</th>
-                                <th>Description</th>
-                                <th>Unit</th>
-                                <th>Qty</th>
-                                <th>Unit Price</th>
-                                <th>Total Amount</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tableBody">
-                            <!-- JS generates rows here -->
-                        </tbody>
-                        <tfoot id="tableFoot" class="hidden">
-                            <tr>
-                                <td colspan="5" class="text-right font-bold bg-gray-100">Grand Total:</td>
-                                <td id="grandTotalVal" class="font-bold text-center bg-gray-100">0.00</td>
-                            </tr>
-                        </tfoot>
-                    </table>
-                    <div id="emptyState" class="text-center text-gray-400 text-sm py-4 hidden">
-                        No table data. Upload Excel or Add Row.
-                    </div>
-                </div>
+                            <div class="overflow-x-auto mb-8">
+                                <table id="mainTable" class="quote-table w-full">
+                                    <thead>
+                                        <tr id="tableHeadRow">
+                                            <th>SL</th>
+                                            <th>Description</th>
+                                            <th>Unit</th>
+                                            <th>Qty</th>
+                                            <th>Unit Price</th>
+                                            <th>Total Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tableBody"></tbody>
+                                    <tfoot id="tableFoot" class="hidden">
+                                        <tr>
+                                            <td colspan="5" class="text-right font-bold bg-slate-50 text-slate-700 border-t-2 border-slate-300 text-sm">Grand Total:</td>
+                                            <td id="grandTotalVal" class="font-bold text-center bg-slate-50 text-slate-800 border-t-2 border-slate-300 text-sm">0.00</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                                <div id="emptyState" class="text-center p-8 border-2 border-dashed border-slate-200 rounded-lg hidden">
+                                    <p class="text-slate-400 text-sm">No line items added yet.</p>
+                                    <p class="text-xs text-slate-300">Upload Excel or use the 'Add Row' button on the left.</p>
+                                </div>
+                            </div>
 
-                <!-- Terms -->
-                <div class="mb-8 text-sm">
-                    <h3 class="font-bold underline mb-2">Terms and Conditions:</h3>
-                    <div id="dispTerms" class="rich-text pl-4 border-l-2 border-gray-300"></div>
-                </div>
+                            <div class="mb-8 text-sm">
+                                <h3 class="font-bold text-slate-800 uppercase text-xs tracking-wider mb-2 border-b border-indigo-200 pb-1 w-max">Terms & Conditions</h3>
+                                <div id="dispTerms" class="rich-text pl-4 border-l-4 border-indigo-100 text-xs"></div>
+                            </div>
 
-                <!-- Signature -->
-                <div class="mt-auto pt-4 break-inside-avoid">
-                    <div class="mb-2">Thanks & Regards,</div>
-                    <div class="mt-4 mb-2 h-16 w-32 relative">
-                        <img id="dispSigImg" src="" class="h-full w-full object-contain hidden" alt="Signature">
-                    </div>
-                    <div id="dispSigName" class="font-bold"></div>
-                    <div id="dispSigPos" class="text-sm"></div>
-                    <div id="dispSigComp" class="text-sm font-bold"></div>
-                </div>
-            </div>
+                            <div class="mt-auto pt-4 keep-together text-slate-800">
+                                <div class="mb-2 text-sm">Thanks & Regards,</div>
+                                <div class="mt-4 mb-2 h-16 w-32 relative">
+                                    <img id="dispSigImg" src="" class="h-full w-full object-contain hidden" alt="Signature">
+                                </div>
+                                <div id="dispSigName" class="font-bold"></div>
+                                <div id="dispSigPos" class="text-sm text-slate-600"></div>
+                                <div id="dispSigComp" class="text-sm font-bold text-slate-600"></div>
+                            </div>
 
-            <!-- Fixed Footer for Print -->
-            <div id="print-footer" class="hidden print:block">
-                 <img id="print-footer-img" src="" class="w-full h-full">
-            </div>
+                        </td>
+                    </tr>
+                </tbody>
 
-            <!-- Footer Shim for Screen -->
-            <div class="screen-footer-shim w-full print:hidden">
+                <tfoot class="hidden print:table-footer-group">
+                    <tr><td class="footer-spacer"></td></tr>
+                </tfoot>
+            </table>
+
+            <div class="screen-only-shim mt-auto w-full print:hidden h-[1.5cm]">
                 <img id="screen-footer-img" src="" class="w-full h-full">
             </div>
 
@@ -399,7 +443,6 @@
     </div>
 
     <script>
-        // --- State Management & Defaults ---
         const defaultTerms = `Price may vary based on the market price and Quotation validity: 05 days.
 Delivery: After confirming the order, delivery will be done at one of your factory premises within 7 days.
 Additional delivery charge applicable for multiple factories.
@@ -407,32 +450,18 @@ Additional delivery charge applicable for multiple factories.
 Mode of Payment: Pay-Order, A/C payee cheque, BEFTN in favor of “ROSHOD.” A/C No: 1263963607001, The City Bank, Routing Number 225260438.
 VAT & TAX: Including VAT & Excluding Tax.`;
 
-        // Initialize
         document.addEventListener('DOMContentLoaded', () => {
-            // Set Default Date
             document.getElementById('inputDate').valueAsDate = new Date();
-            
-            // Set Default Terms
             document.getElementById('inputTerms').value = defaultTerms;
-
-            // Initial Render of Branding
             updateBranding();
-            
-            // Listeners for live updates
             setupInputListeners();
-
-            // Initial Table Layout (Empty)
-            // If we wanted a default table:
-            // renderTable(['Item', 'Description', 'Qty', 'Unit Price', 'Total'], [['Widget A', 'High quality', 10, 100, 1000]]);
             renderTable(['SL', 'Description', 'Unit', 'Qty', 'Unit Price', 'Total Amount'], []);
         });
 
-        // --- Branding Logic ---
         function toggleSource(type) {
             const select = document.getElementById(type + 'Type');
             const urlInput = document.getElementById(type + 'Url');
             const fileInput = document.getElementById(type + 'File');
-            
             if (select.value === 'url') {
                 urlInput.classList.remove('hidden');
                 fileInput.classList.add('hidden');
@@ -485,7 +514,6 @@ VAT & TAX: Including VAT & Excluding Tax.`;
             }
         }
 
-        // --- Live Preview Listeners ---
         function setupInputListeners() {
             const mappings = [
                 { id: 'inputDate', target: 'dispDate', format: (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '' },
@@ -499,32 +527,24 @@ VAT & TAX: Including VAT & Excluding Tax.`;
                 { id: 'sigPos', target: 'dispSigPos' },
                 { id: 'sigComp', target: 'dispSigComp' },
             ];
-
             mappings.forEach(map => {
                 const input = document.getElementById(map.id);
                 const target = document.getElementById(map.target);
-                
-                const update = () => {
-                    target.textContent = map.format ? map.format(input.value) : input.value;
-                };
-                
+                const update = () => { target.textContent = map.format ? map.format(input.value) : input.value; };
                 input.addEventListener('input', update);
-                update(); // Initial call
+                update(); 
             });
         }
 
-        // --- Excel & Table Logic ---
         document.getElementById('excelUpload').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
-
             const reader = new FileReader();
             reader.onload = function(e) {
                 const data = new Uint8Array(e.target.result);
                 const workbook = XLSX.read(data, {type: 'array'});
                 const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                const jsonData = XLSX.utils.sheet_to_json(firstSheet, {header: 1}); // Array of Arrays
-                
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet, {header: 1}); 
                 if (jsonData.length > 0) {
                     const headers = jsonData[0];
                     const rows = jsonData.slice(1);
@@ -537,50 +557,36 @@ VAT & TAX: Including VAT & Excluding Tax.`;
         function renderTable(headers, rows) {
             const thead = document.getElementById('tableHeadRow');
             const tbody = document.getElementById('tableBody');
-            
             thead.innerHTML = '';
             tbody.innerHTML = '';
-
-            // Render Headers
             headers.forEach((h, index) => {
                 const th = document.createElement('th');
                 th.contentEditable = true;
                 th.textContent = h || `Col ${index+1}`;
-                th.onblur = calculateGrandTotal; // Recalc if header changes (might affect detection)
-                
-                // Add delete col button on hover logic? Too complex for single file cleanly.
-                // Instead, simple right click or just double click to edit.
+                th.onblur = calculateGrandTotal;
                 thead.appendChild(th);
             });
-
-            // Render Rows
             rows.forEach(row => {
                 const tr = document.createElement('tr');
-                // Ensure row has enough cells matching header
                 for(let i=0; i<headers.length; i++) {
                     const td = document.createElement('td');
                     td.contentEditable = true;
                     td.textContent = row[i] !== undefined ? row[i] : '';
-                    td.addEventListener('input', calculateGrandTotal); // Live calc
+                    td.addEventListener('input', calculateGrandTotal);
                     tr.appendChild(td);
                 }
-                
-                // Delete Row Button (Only visible on hover/non-print)
                 const delBtn = document.createElement('td');
                 delBtn.className = 'no-print w-8 text-center border-0 bg-transparent cursor-pointer text-red-400 hover:text-red-600';
                 delBtn.innerHTML = '<i class="fas fa-trash"></i>';
                 delBtn.onclick = function() { tr.remove(); calculateGrandTotal(); };
                 tr.appendChild(delBtn);
-
                 tbody.appendChild(tr);
             });
-
             if(rows.length === 0) {
                 document.getElementById('emptyState').classList.remove('hidden');
             } else {
                 document.getElementById('emptyState').classList.add('hidden');
             }
-
             calculateGrandTotal();
         }
 
@@ -588,20 +594,17 @@ VAT & TAX: Including VAT & Excluding Tax.`;
             const tbody = document.getElementById('tableBody');
             const colCount = document.getElementById('tableHeadRow').children.length;
             const tr = document.createElement('tr');
-            
             for(let i=0; i<colCount; i++) {
                 const td = document.createElement('td');
                 td.contentEditable = true;
                 td.addEventListener('input', calculateGrandTotal);
                 tr.appendChild(td);
             }
-
             const delBtn = document.createElement('td');
             delBtn.className = 'no-print w-8 text-center border-0 bg-transparent cursor-pointer text-red-400 hover:text-red-600';
             delBtn.innerHTML = '<i class="fas fa-trash"></i>';
             delBtn.onclick = function() { tr.remove(); calculateGrandTotal(); };
             tr.appendChild(delBtn);
-
             tbody.appendChild(tr);
             document.getElementById('emptyState').classList.add('hidden');
         }
@@ -609,16 +612,11 @@ VAT & TAX: Including VAT & Excluding Tax.`;
         function addColumn() {
             const thead = document.getElementById('tableHeadRow');
             const tbody = document.getElementById('tableBody');
-
-            // Add Header
             const th = document.createElement('th');
             th.contentEditable = true;
             th.textContent = 'New Col';
             thead.appendChild(th);
-
-            // Add Cell to every row
             Array.from(tbody.children).forEach(tr => {
-                // Insert before the delete button (last child)
                 const td = document.createElement('td');
                 td.contentEditable = true;
                 td.addEventListener('input', calculateGrandTotal);
@@ -628,29 +626,26 @@ VAT & TAX: Including VAT & Excluding Tax.`;
 
         function resetTable() {
             if(confirm('Clear current table?')) {
-                renderTable(['Item', 'Qty', 'Price', 'Total'], []);
+                renderTable(['SL', 'Description', 'Unit', 'Qty', 'Unit Price', 'Total Amount'], []);
             }
         }
 
-        // --- Grand Total Logic ---
         function calculateGrandTotal() {
             const enabled = document.getElementById('enableTotal').checked;
             const tfoot = document.getElementById('tableFoot');
             const totalDisplay = document.getElementById('grandTotalVal');
 
+            // FIX: If disabled, hide on screen and enforce hidden state in print.
             if (!enabled) {
-                tfoot.classList.add('hidden');
+                tfoot.classList.add('hidden'); // Hides on screen
+                tfoot.classList.add('print-hidden-footer'); // Hides robustly in print
                 return;
             }
 
             const headerRow = document.getElementById('tableHeadRow');
             const headers = Array.from(headerRow.children).map(th => th.textContent.toLowerCase());
             const totalCols = headers.length;
-            
-            // Heuristic to find the Total column
             let colIndex = headers.findIndex(h => h.includes('total') || h.includes('amount') || h.includes('price'));
-            
-            // If heuristics fail, default to the last column
             if (colIndex === -1 && totalCols > 0) colIndex = totalCols - 1;
 
             if (colIndex !== -1) {
@@ -658,48 +653,27 @@ VAT & TAX: Including VAT & Excluding Tax.`;
                 const tbody = document.getElementById('tableBody');
                 Array.from(tbody.children).forEach(tr => {
                     const cells = tr.children;
-                    // Note: Cells includes the hidden 'delete' cell in DOM, but header doesn't have it initially usually?
-                    // Actually delete button is a td. Headers are th.
-                    // We need to be careful about index alignment. 
-                    // Our renderTable adds a 'delete' TD at the end of rows, but typically no TH for it unless added?
-                    // Actually renderTable does NOT add a TH for the delete button, but DOES add a TD.
-                    // So cell[colIndex] is valid.
-                    
                     if (cells[colIndex]) {
                         const raw = cells[colIndex].textContent;
-                        // Allow negative numbers, remove currency symbols
                         const clean = raw.replace(/[^0-9.-]+/g, ""); 
                         const val = parseFloat(clean);
                         if (!isNaN(val)) sum += val;
                     }
                 });
-
-                totalDisplay.textContent = sum.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
-                tfoot.classList.remove('hidden');
                 
-                // Adjust colspan to align borders correctly
-                // Row structure: [Label Cell] [Value Cell]
-                // Label Cell spans from 0 to colIndex (exclusive)
-                // Value Cell is at colIndex
-                // If there are columns AFTER colIndex, we technically need another spacer or extend the Value cell.
-                // Let's make the value cell extend to the end.
+                totalDisplay.textContent = sum.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                tfoot.classList.remove('hidden'); // Show on screen
+                tfoot.classList.remove('print-hidden-footer'); // Ensure visible in print
                 
                 const labelCell = tfoot.firstElementChild.firstElementChild;
                 const valueCell = document.getElementById('grandTotalVal');
-                
-                // Ensure colIndex is at least 1 for the label to exist
                 const safeColIndex = Math.max(1, colIndex);
-                
                 labelCell.colSpan = safeColIndex;
-                
-                // Value cell spans the rest
-                // Total columns in visual table = header count.
-                // Rows have header count + 1 (delete button).
-                // But Footer doesn't have delete button.
                 valueCell.colSpan = totalCols - safeColIndex;
-                
             } else {
+                // If enabled but column not found (e.g., table structure changed), hide it.
                 tfoot.classList.add('hidden');
+                tfoot.classList.add('print-hidden-footer'); 
             }
         }
     </script>
