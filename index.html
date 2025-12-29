@@ -198,11 +198,6 @@
             .content-cell { padding-left: 1.5cm; padding-right: 1.5cm; vertical-align: top; }
             tr { page-break-inside: avoid; }
             .keep-together { page-break-inside: avoid; }
-
-            /* FIX: Ensure hidden footer stays hidden in print when calculation is disabled */
-            .print-hidden-footer {
-                display: none !important;
-            }
         }
     </style>
 </head>
@@ -265,6 +260,10 @@
                     <div class="form-group">
                         <label class="modern-label">Date</label>
                         <input type="date" id="inputDate" class="modern-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="modern-label">Salutation</label>
+                        <input type="text" id="inputSalutation" class="modern-input" value="Dear Sir,">
                     </div>
                     <div class="form-group">
                         <label class="modern-label">Recipient Details</label>
@@ -381,7 +380,7 @@
                             </div>
 
                             <div class="mb-6 text-slate-700 leading-relaxed text-sm">
-                                <p class="mb-2">Dear Sir,</p>
+                                <p id="dispSalutation" class="mb-2"></p>
                                 <p id="dispOpening" class="text-justify"></p>
                             </div>
 
@@ -398,13 +397,10 @@
                                         </tr>
                                     </thead>
                                     <tbody id="tableBody"></tbody>
-                                    <tfoot id="tableFoot" class="hidden">
-                                        <tr>
-                                            <td colspan="5" class="text-right font-bold bg-slate-50 text-slate-700 border-t-2 border-slate-300 text-sm">Grand Total:</td>
-                                            <td id="grandTotalVal" class="font-bold text-center bg-slate-50 text-slate-800 border-t-2 border-slate-300 text-sm">0.00</td>
-                                        </tr>
-                                    </tfoot>
                                 </table>
+                                <div id="tableFooter" class="mt-4 border-t-2 border-slate-300 pt-2">
+                                    <!-- Grand total will be inserted here -->
+                                </div>
                                 <div id="emptyState" class="text-center p-8 border-2 border-dashed border-slate-200 rounded-lg hidden">
                                     <p class="text-slate-400 text-sm">No line items added yet.</p>
                                     <p class="text-xs text-slate-300">Upload Excel or use the 'Add Row' button on the left.</p>
@@ -447,7 +443,7 @@
 Delivery: After confirming the order, delivery will be done at one of your factory premises within 7 days.
 Additional delivery charge applicable for multiple factories.
 80% Advance payment and 20% on delivery date.
-Mode of Payment: Pay-Order, A/C payee cheque, BEFTN in favor of “ROSHOD.” A/C No: 1263963607001, The City Bank, Routing Number 225260438.
+Mode of Payment: Pay-Order, A/C payee cheque, BEFTN in favor of "ROSHOD." A/C No: 1263963607001, The City Bank, Routing Number 225260438.
 VAT & TAX: Including VAT & Excluding Tax.`;
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -517,6 +513,7 @@ VAT & TAX: Including VAT & Excluding Tax.`;
         function setupInputListeners() {
             const mappings = [
                 { id: 'inputDate', target: 'dispDate', format: (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '' },
+                { id: 'inputSalutation', target: 'dispSalutation' },
                 { id: 'inputToName', target: 'dispToName' },
                 { id: 'inputToPos', target: 'dispToPos' },
                 { id: 'inputToComp', target: 'dispToComp' },
@@ -632,49 +629,56 @@ VAT & TAX: Including VAT & Excluding Tax.`;
 
         function calculateGrandTotal() {
             const enabled = document.getElementById('enableTotal').checked;
-            const tfoot = document.getElementById('tableFoot');
-            const totalDisplay = document.getElementById('grandTotalVal');
-
-            // FIX: If disabled, hide on screen and enforce hidden state in print.
+            const tableFooter = document.getElementById('tableFooter');
+            
             if (!enabled) {
-                tfoot.classList.add('hidden'); // Hides on screen
-                tfoot.classList.add('print-hidden-footer'); // Hides robustly in print
+                tableFooter.innerHTML = '';
                 return;
             }
 
             const headerRow = document.getElementById('tableHeadRow');
-            const headers = Array.from(headerRow.children).map(th => th.textContent.toLowerCase());
-            const totalCols = headers.length;
-            let colIndex = headers.findIndex(h => h.includes('total') || h.includes('amount') || h.includes('price'));
-            if (colIndex === -1 && totalCols > 0) colIndex = totalCols - 1;
+            const headers = Array.from(headerRow.children).map(th => th.textContent.toLowerCase().trim());
+            
+            // Find total column - case insensitive match for total/amount variations
+            let totalColIndex = -1;
+            const totalKeywords = ['total', 'amount', 'amt'];
+            
+            headers.forEach((header, index) => {
+                if (totalKeywords.some(keyword => header.includes(keyword))) {
+                    totalColIndex = index;
+                }
+            });
 
-            if (colIndex !== -1) {
-                let sum = 0;
-                const tbody = document.getElementById('tableBody');
-                Array.from(tbody.children).forEach(tr => {
-                    const cells = tr.children;
-                    if (cells[colIndex]) {
-                        const raw = cells[colIndex].textContent;
-                        const clean = raw.replace(/[^0-9.-]+/g, ""); 
-                        const val = parseFloat(clean);
-                        if (!isNaN(val)) sum += val;
-                    }
-                });
-                
-                totalDisplay.textContent = sum.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
-                tfoot.classList.remove('hidden'); // Show on screen
-                tfoot.classList.remove('print-hidden-footer'); // Ensure visible in print
-                
-                const labelCell = tfoot.firstElementChild.firstElementChild;
-                const valueCell = document.getElementById('grandTotalVal');
-                const safeColIndex = Math.max(1, colIndex);
-                labelCell.colSpan = safeColIndex;
-                valueCell.colSpan = totalCols - safeColIndex;
-            } else {
-                // If enabled but column not found (e.g., table structure changed), hide it.
-                tfoot.classList.add('hidden');
-                tfoot.classList.add('print-hidden-footer'); 
+            if (totalColIndex === -1) {
+                // If no total column found, hide the grand total
+                tableFooter.innerHTML = '';
+                return;
             }
+
+            let sum = 0;
+            const tbody = document.getElementById('tableBody');
+            Array.from(tbody.children).forEach(tr => {
+                const cells = tr.children;
+                if (cells[totalColIndex]) {
+                    const raw = cells[totalColIndex].textContent;
+                    const clean = raw.replace(/[^0-9.-]+/g, ""); 
+                    const val = parseFloat(clean);
+                    if (!isNaN(val)) sum += val;
+                }
+            });
+
+            // Create grand total display outside the table (not in tfoot)
+            const totalColSpan = Math.max(1, totalColIndex);
+            const valueColSpan = headers.length - totalColSpan;
+            
+            tableFooter.innerHTML = `
+                <table class="w-full">
+                    <tr>
+                        <td colspan="${totalColSpan}" class="text-right font-bold bg-slate-50 text-slate-700 border-t-2 border-slate-300 text-sm p-2">Grand Total:</td>
+                        <td colspan="${valueColSpan}" class="font-bold text-center bg-slate-50 text-slate-800 border-t-2 border-slate-300 text-sm p-2">${sum.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                    </tr>
+                </table>
+            `;
         }
     </script>
 </body>
